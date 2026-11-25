@@ -1,0 +1,77 @@
+name: Release
+
+# Publishes Retcon::VERSION to RubyGems: push a tag vX.Y.Z on main, or run this workflow by hand on main (it tags
+# the commit itself). Publishing uses RubyGems trusted publishing: rubygems.org trusts this workflow, so no API key is
+# stored in the repository.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: rubygems
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - run: bundle exec rspec
+      - name: Tag the version
+        id: tag
+        run: |
+          version=$(ruby -r ./lib/retcon/version -e 'print Retcon::VERSION')
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, gem version $version"; exit 1; }
+          else
+            test "$GITHUB_REF_NAME" = main || { echo "release from main, not $GITHUB_REF_NAME"; exit 1; }
+          fi
+          if ! git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git tag -a "v$version" -m "retcon $version"
+            git push origin "v$version"
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+      # Trusted publishing, with this repository's RubyGems owner asserted: a pending trusted publisher only lets the
+      # first push create the gem when the exchange names the account that set it up (rickmark, id 81513).
+      - name: Already on RubyGems?
+        id: published
+        run: |
+          version=${TAG#v}
+          if curl -sSf "https://rubygems.org/api/v2/rubygems/retcon/versions/$version.json" > /dev/null; then
+            echo "retcon $version is already published"; echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+      - name: RubyGems credentials
+        if: steps.published.outputs.done != 'true'
+        env:
+          RUBYGEMS_OWNER: '81513'
+        run: |
+          jwt=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=rubygems.org" | jq -r .value)
+          key=$(jq -n --arg jwt "$jwt" --arg owner "$RUBYGEMS_OWNER" '{jwt: $jwt, owner: $owner}' |
+            curl -sS --fail-with-body -H 'Content-Type: application/json' --data @- \
+              https://rubygems.org/api/v1/oidc/trusted_publisher/exchange_token | jq -r .rubygems_api_key)
+          echo "::add-mask::$key"
+          echo "GEM_HOST_API_KEY=$key" >> "$GITHUB_ENV"
+      - uses: rubygems/release-gem@v1
+        if: steps.published.outputs.done != 'true'
+        with:
+          setup-trusted-publisher: 'false'
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 && { echo "release $TAG exists"; exit 0; }
+          mkdir -p pkg; test -n "$(ls pkg/*.gem 2>/dev/null)" || gem build retcon.gemspec --output "pkg/retcon-${TAG#v}.gem"
+          ruby -e 'print File.read("CHANGELOG.md")[/^## #{ARGV[0].delete_prefix("v")} .*?(?=^## |\z)/m]' "$TAG" > notes.md
+          gh release create "$TAG" pkg/*.gem --title "$TAG" --notes-file notes.md
