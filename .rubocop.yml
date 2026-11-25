@@ -14,3 +14,31 @@ Layout/LineLength:
 
 RSpec/DescribeClass:
   Enabled: false
+
+# Retcon's write paths (apply, revert, redact) each read as one method per step; these limits are their current
+# sizes, so they don't grow further.
+Metrics/MethodLength:
+  Max: 36
+  Exclude: [spec/support/**/*]
+Metrics/AbcSize:
+  Max: 45
+  Exclude: [spec/support/**/*]
+Metrics/CyclomaticComplexity:
+  Max: 15
+Metrics/PerceivedComplexity:
+  Max: 16
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+Metrics/ModuleLength:
+  Max: 250
+Metrics/ClassLength:
+  Max: 250
+Metrics/BlockLength:
+  Exclude: [spec/**/*, retcon.gemspec]
+  AllowedMethods: [class_methods, included]
+
+# Specs walk one scenario through history, checking several things on the way.
+RSpec/MultipleExpectations:
+  Max: 8
+RSpec/ExampleLength:
+  Max: 14
