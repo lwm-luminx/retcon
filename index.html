@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>retcon</title>
+<meta name="description" content="VCS-style history for Active Record on PostgreSQL: attributed changesets, proposals, reverts and redaction.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf8;--panel:#f3f1ed;--text:#1d1b19;--muted:#6b665f;--line:#e4e0d9;--accent:#7a3cff;--accent-soft:#efe7ff;--code-bg:#f4f2ee;--kw:#8a2fc9;--st:#1d7a46;--co:#8a857d;--dv:#b4501a;--dt:#1f5fbf;--at:#0e7490;--wa:#b4235a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#141316;--panel:#1c1b1f;--text:#ecebe8;--muted:#a19c95;--line:#2d2b30;--accent:#b597ff;--accent-soft:#2a2240;--code-bg:#1b1a1e;--kw:#c79bff;--st:#7fd19b;--co:#8a857d;--dv:#f0a46b;--dt:#82b4ff;--at:#6fd3e6;--wa:#ff8db5}}
+:root[data-theme="dark"]{--bg:#141316;--panel:#1c1b1f;--text:#ecebe8;--muted:#a19c95;--line:#2d2b30;--accent:#b597ff;--accent-soft:#2a2240;--code-bg:#1b1a1e;--kw:#c79bff;--st:#7fd19b;--co:#8a857d;--dv:#f0a46b;--dt:#82b4ff;--at:#6fd3e6;--wa:#ff8db5}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 Inter,system-ui,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1180px;margin:0 auto}
+nav{position:sticky;top:0;height:100vh;overflow:auto;padding:28px 20px 40px max(20px,env(safe-area-inset-left,0px));border-right:1px solid var(--line)}
+nav .brand{font-weight:700;font-size:18px;margin-bottom:2px} nav .brand code{font-size:17px;background:none;padding:0}
+nav .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+nav ul{list-style:none;margin:0;padding:0} nav li{margin:0}
+nav a{display:block;color:var(--muted);font-size:13.5px;padding:3px 8px;border-radius:6px}
+nav a.top{color:var(--text);font-weight:600;font-size:14px;margin-top:10px}
+nav a.active{background:var(--accent-soft);color:var(--accent)}
+nav ul ul a{padding-left:16px}
+main{padding:40px max(16px,env(safe-area-inset-right,0px)) 120px 48px;min-width:0}
+.hero{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.hero h1{font-size:40px;line-height:1.1;margin:0 0 12px;letter-spacing:-.02em}
+.hero p{color:var(--muted);font-size:18px;margin:0;max-width:62ch}
+.links{margin-top:14px!important;font-size:15px!important}.install{margin:18px 0 0;max-width:340px}
+.pill{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px;margin-bottom:14px}
+section{padding-top:36px;border-top:1px solid var(--line);margin-top:36px} section:first-of-type{border-top:0;margin-top:0}
+section h1{font-size:30px;letter-spacing:-.015em;margin:0 0 12px}
+h2{font-size:21px;margin:32px 0 8px} h3{font-size:17px;margin:24px 0 6px}
+p,li{max-width:72ch}
+code{font-variant-ligatures:none;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;line-height:1.55}
+pre code{font-variant-ligatures:none;background:none;padding:0;font-size:13px}
+.sourceCode span{} .kw,.cf{color:var(--kw)} .st,.vs,.ss{color:var(--st)} .co{color:var(--co);font-style:italic} .dv,.fl,.cn{color:var(--dv)} .dt{color:var(--dt)} .at,.fu{color:var(--at)} .wa{color:var(--wa)}
+.tw{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel);font-weight:600} tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+@media (max-width:860px){
+ .wrap{display:block}
+ nav{position:sticky;top:0;z-index:5;height:auto;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:var(--bg);border-right:0;border-bottom:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-left,0px))}
+ nav .brand,nav .sub,nav ul ul{display:none} nav>ul>li{display:inline-block} nav a.top{margin:0 4px 0 0;font-size:13px}
+ main{padding:24px max(16px,env(safe-area-inset-right,0px)) 80px max(16px,env(safe-area-inset-left,0px))}
+ html{scroll-padding-top:56px} .hero h1{font-size:30px} td code{white-space:normal}
+}
+</style></head><body><div class="wrap">
+<nav><div class="brand"><code>retcon</code></div><div class="sub">History for Active Record on PostgreSQL</div><ul><li><a href="#getting-started" class="top">Getting started</a><ul><li><a href="#getting-started-install">Install</a></li><li><a href="#getting-started-create-the-tables">Create the tables</a></li><li><a href="#getting-started-version-a-model">Version a model</a></li><li><a href="#getting-started-make-attributed-changes">Make attributed changes</a></li><li><a href="#getting-started-read-history">Read history</a></li><li><a href="#getting-started-where-to-go-next">Where to go next</a></li></ul></li><li><a href="#models" class="top">Models</a><ul><li><a href="#models-versioned-fields">Versioned fields</a></li><li><a href="#models-scope">Scope</a></li><li><a href="#models-merge-strategies">Merge strategies</a></li><li><a href="#models-schema-versions">Schema versions</a></li><li><a href="#models-associations-and-callbacks">Associations and callbacks</a></li><li><a href="#models-instance-and-class-methods">Instance and class methods</a></li></ul></li><li><a href="#changesets-and-actors" class="top">Changesets and actors</a><ul><li><a href="#changesets-and-actors-changesets">Changesets</a></li><li><a href="#changesets-and-actors-actors">Actors</a></li><li><a href="#changesets-and-actors-events">Events</a></li></ul></li><li><a href="#conflicts" class="top">Conflicts</a><ul><li><a href="#conflicts-the-base-version">The base version</a></li><li><a href="#conflicts-web-forms-an-explicit-base">Web forms: an explicit base</a></li><li><a href="#conflicts-handling-a-conflict">Handling a conflict</a></li><li><a href="#conflicts-proposals">Proposals</a></li></ul></li><li><a href="#proposals" class="top">Proposals</a><ul><li><a href="#proposals-opening-one">Opening one</a></li><li><a href="#proposals-reviewing">Reviewing</a></li><li><a href="#proposals-policy-commit-propose-or-deny">Policy: commit, propose or deny</a></li><li><a href="#proposals-routing-reviews">Routing reviews</a></li><li><a href="#proposals-proposed-rows-in-history">Proposed rows in history</a></li></ul></li><li><a href="#reverts" class="top">Reverts</a><ul><li><a href="#reverts-what-a-revert-does">What a revert does</a></li><li><a href="#reverts-undoing-a-revert">Undoing a revert</a></li><li><a href="#reverts-reviving-one-record">Reviving one record</a></li><li><a href="#reverts-rebuilding">Rebuilding</a></li></ul></li><li><a href="#drift" class="top">Drift and bulk writes</a><ul><li><a href="#drift-how-drift-is-found">How drift is found</a></li><li><a href="#drift-skipping-history-on-purpose">Skipping history on purpose</a></li><li><a href="#drift-bulk-writes-with-attribution">Bulk writes with attribution</a></li></ul></li><li><a href="#redaction" class="top">Redaction</a><ul><li><a href="#redaction-commitments">Commitments</a></li><li><a href="#redaction-scrubbing-a-field">Scrubbing a field</a></li><li><a href="#redaction-pseudonymizing-an-editor">Pseudonymizing an editor</a></li><li><a href="#redaction-deletion-requests">Deletion requests</a></li></ul></li><li><a href="#edges" class="top">Edges</a><ul><li><a href="#edges-linking-and-unlinking">Linking and unlinking</a></li><li><a href="#edges-walking-the-graph">Walking the graph</a></li></ul></li><li><a href="#schema-evolution" class="top">Schema evolution</a><ul><li><a href="#schema-evolution-versions-and-upcasters">Versions and upcasters</a></li><li><a href="#schema-evolution-changing-columns">Changing columns</a></li><li><a href="#schema-evolution-live-columns">Live columns</a></li></ul></li><li><a href="#internals" class="top">Internals</a><ul><li><a href="#internals-tables">Tables</a></li><li><a href="#internals-one-transaction">One transaction</a></li><li><a href="#internals-replaying">Replaying</a></li><li><a href="#internals-cost">Cost</a></li></ul></li><li><a href="#reference" class="top">Reference</a><ul><li><a href="#reference-retcon">Retcon</a></li><li><a href="#reference-retconchangeset">Retcon::Changeset</a></li><li><a href="#reference-retconproposalbuilder">Retcon::Proposal::Builder</a></li><li><a href="#reference-retconactor">Retcon::Actor</a></li><li><a href="#reference-retconredaction">Retcon::Redaction</a></li><li><a href="#reference-retconbulk">Retcon::Bulk</a></li><li><a href="#reference-retconedge">Retcon::Edge</a></li><li><a href="#reference-retconschema-migrations">Retcon::Schema (migrations)</a></li><li><a href="#reference-errors">Errors</a></li></ul></li></ul></nav>
+<main><div class="hero"><span class="pill">v0.1.0 &middot; MIT</span><h1>retcon</h1>
+<p>Field-level history for every versioned table, with live tables kept as a projection of it. Edits are attributed changesets; proposals wait for review like pull requests; an actor&rsquo;s damage reverts without losing the work that came after it; and redaction scrubs a value from history while history still verifies.</p>
+<pre class="install"><code>gem 'retcon'</code></pre>
+<p class="links"><a href="https://github.com/lwm-luminx/retcon">GitHub</a> &middot; <a href="https://rubygems.org/gems/retcon">RubyGems</a> &middot; <a href="https://github.com/lwm-luminx/retcon/blob/main/CHANGELOG.md">Changelog</a></p></div>
+<section id="getting-started"><h1>Getting started</h1>
+<p>retcon keeps a full, field-level history of the Active Record models you choose, on PostgreSQL. Every save is attributed to someone and grouped into a <strong>changeset</strong>. Changes can also be <strong>proposed</strong> and applied later after review, like a pull request. When something goes wrong (a bad delete, a vandal, a privacy request), you repair it with a new changeset instead of restoring a backup, and the good work that came after it stays.</p>
+<p>Your live tables don't move and don't get slower. They become a <strong>projection</strong> of history: written in the same transaction as the history rows, and rebuildable from them at any time.</p>
+<h2 id="getting-started-install">Install</h2>
+<div class="sourceCode" id="getting-started-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb1-1"><span class="co"># Gemfile</span></span>
+<span id="getting-started-cb1-2">gem <span class="vs">&#39;retcon&#39;</span></span></code></pre></div>
+<p>retcon needs Ruby 3.3+, Active Record 7.1+ and PostgreSQL 15+ through the <code>pg</code> adapter.</p>
+<h2 id="getting-started-create-the-tables">Create the tables</h2>
+<p>One migration creates retcon's shared tables, and one call per table versions it:</p>
+<div class="sourceCode" id="getting-started-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb2-1"><span class="cf">class</span> <span class="dt">InstallRetcon</span> <span class="op">&lt;</span> <span class="dt">ActiveRecord</span><span class="op">::</span><span class="dt">Migration</span><span class="kw">[</span><span class="fl">8.0</span><span class="kw">]</span></span>
+<span id="getting-started-cb2-2">  <span class="fu">include</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Schema</span></span>
+<span id="getting-started-cb2-3"></span>
+<span id="getting-started-cb2-4">  <span class="cf">def</span> change</span>
+<span id="getting-started-cb2-5">    create_retcon_tables   <span class="co"># retcon_actors, retcon_changesets and the retcon_seq sequence</span></span>
+<span id="getting-started-cb2-6">    version_table <span class="wa">:venues</span>  <span class="co"># retcon_venues, three columns on venues, and a trigger</span></span>
+<span id="getting-started-cb2-7">    version_table <span class="wa">:events</span></span>
+<span id="getting-started-cb2-8">  <span class="cf">end</span></span>
+<span id="getting-started-cb2-9"><span class="cf">end</span></span></code></pre></div>
+<p><code>version_table</code> creates the history table <code>retcon_venues</code>, adds <code>retcon_seq</code>, <code>retcon_digest</code> and <code>retcon_dirty</code> to <code>venues</code>, and installs a trigger that marks rows written outside retcon (see <a href="#drift">Drift and bulk writes</a>).</p>
+<h2 id="getting-started-version-a-model">Version a model</h2>
+<div class="sourceCode" id="getting-started-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb3-1"><span class="cf">class</span> <span class="dt">Venue</span> <span class="op">&lt;</span> <span class="dt">ApplicationRecord</span></span>
+<span id="getting-started-cb3-2">  <span class="fu">include</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Model</span></span>
+<span id="getting-started-cb3-3"><span class="cf">end</span></span></code></pre></div>
+<p>That's all a model needs. Every column is versioned except the primary key, timestamps, <code>lock_version</code>, counter caches (<code>*_count</code>) and retcon's own columns. <a href="#models">Models</a> covers choosing fields.</p>
+<p>Rows that existed before retcon have no history yet. Give them a starting point once, after the migration:</p>
+<div class="sourceCode" id="getting-started-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb4-1"><span class="dt">Venue</span><span class="at">.retcon_genesis!</span>   <span class="co"># one &quot;Genesis&quot; changeset per batch of 500 rows</span></span></code></pre></div>
+<h2 id="getting-started-make-attributed-changes">Make attributed changes</h2>
+<p>Wrap changes in <code>Retcon.as</code> to say who made them:</p>
+<div class="sourceCode" id="getting-started-cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb5-1"><span class="dt">Retcon</span><span class="at">.as</span>(current_user) <span class="cf">do</span></span>
+<span id="getting-started-cb5-2">  venue<span class="at">.update!</span>(<span class="wa">name:</span> <span class="vs">&#39;The Eagle&#39;</span>, <span class="wa">phone:</span> <span class="vs">&#39;555-0100&#39;</span>)</span>
+<span id="getting-started-cb5-3"><span class="cf">end</span></span></code></pre></div>
+<p>Saves work exactly as before: validations and callbacks run, and <code>save</code> still returns <code>true</code> or <code>false</code>. retcon adds a changeset with the user as its author, a version row for each changed field, and the record's new <code>retcon_seq</code>.</p>
+<p>Group several saves into one changeset with a message:</p>
+<div class="sourceCode" id="getting-started-cb6"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb6-1"><span class="dt">Retcon</span><span class="at">.changeset</span>(<span class="wa">actor:</span> current_user, <span class="wa">message:</span> <span class="vs">&#39;New season&#39;</span>) <span class="cf">do</span></span>
+<span id="getting-started-cb6-2">  venue<span class="at">.update!</span>(<span class="wa">hours:</span> <span class="op">{</span> <span class="vs">&#39;tue&#39;</span> <span class="op">=&gt;</span> <span class="vs">&#39;4pm-2am&#39;</span> <span class="op">}</span>)</span>
+<span id="getting-started-cb6-3">  venue<span class="at">.events.create!</span>(<span class="wa">name:</span> <span class="vs">&#39;Drag Bingo&#39;</span>)</span>
+<span id="getting-started-cb6-4"><span class="cf">end</span></span></code></pre></div>
+<h2 id="getting-started-read-history">Read history</h2>
+<div class="sourceCode" id="getting-started-cb7"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="getting-started-cb7-1">venue<span class="at">.retcon_versions</span>          <span class="co"># every version row, oldest first</span></span>
+<span id="getting-started-cb7-2">venue<span class="at">.retcon_heads</span><span class="kw">[</span><span class="vs">&#39;phone&#39;</span><span class="kw">]</span>    <span class="co"># the current version of a field: seq, value, row_id (blame)</span></span>
+<span id="getting-started-cb7-3"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Changeset</span><span class="at">.last.author</span>  <span class="co"># who made the last change</span></span>
+<span id="getting-started-cb7-4"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Changeset</span><span class="at">.last.changes</span> <span class="co"># {[Venue, id] =&gt; {&#39;name&#39; =&gt; &#39;The Eagle&#39;, ...}}</span></span>
+<span id="getting-started-cb7-5"><span class="dt">Venue</span><span class="at">.retcon_state</span>(venue<span class="at">.id</span>)   <span class="co"># the record as history says it is</span></span></code></pre></div>
+<h2 id="getting-started-where-to-go-next">Where to go next</h2>
+<ul>
+<li><a href="#changesets-and-actors">Changesets and actors</a>: attribution, agents, events.</li>
+<li><a href="#conflicts">Conflicts</a>: what happens when two people edit the same record.</li>
+<li><a href="#proposals">Proposals</a>: changes that wait for review.</li>
+<li><a href="#reverts">Reverts</a>: undoing an actor's changes without losing later work.</li>
+<li><a href="#redaction">Redaction</a>: removing what history must not keep.</li>
+</ul>
+</section><section id="models"><h1>Models</h1>
+<p>Include <code>Retcon::Model</code> in any Active Record model whose table was versioned with <code>version_table</code>. Settings go in a <code>versioned</code> block:</p>
+<div class="sourceCode" id="models-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="models-cb1-1"><span class="cf">class</span> <span class="dt">Venue</span> <span class="op">&lt;</span> <span class="dt">ApplicationRecord</span></span>
+<span id="models-cb1-2">  <span class="fu">include</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Model</span></span>
+<span id="models-cb1-3"></span>
+<span id="models-cb1-4">  versioned <span class="cf">do</span></span>
+<span id="models-cb1-5">    ignore <span class="wa">:view_count</span>, <span class="wa">:search_vector</span></span>
+<span id="models-cb1-6">    merge <span class="wa">:tags</span>, <span class="wa">:set_union</span></span>
+<span id="models-cb1-7">    scope(<span class="op">&amp;</span><span class="wa">:audience_id</span>)</span>
+<span id="models-cb1-8">  <span class="cf">end</span></span>
+<span id="models-cb1-9"><span class="cf">end</span></span></code></pre></div>
+<h2 id="models-versioned-fields">Versioned fields</h2>
+<p>By default every column is versioned except:</p>
+<ul>
+<li>the primary key and retcon's own columns (<code>retcon_seq</code>, <code>retcon_digest</code>, <code>retcon_dirty</code>);</li>
+<li><code>created_at</code>, <code>updated_at</code> and <code>lock_version</code>;</li>
+<li>counter caches: any column ending in <code>_count</code>.</li>
+</ul>
+<p><code>ignore</code> leaves more out. <code>only</code> names the versioned fields outright instead:</p>
+<div class="sourceCode" id="models-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="models-cb2-1">versioned <span class="cf">do</span></span>
+<span id="models-cb2-2">  only <span class="wa">:name</span>, <span class="wa">:address</span>, <span class="wa">:phone</span></span>
+<span id="models-cb2-3"><span class="cf">end</span></span></code></pre></div>
+<p><code>Venue.retcon_config.tracked_fields</code> lists the result. A save that changes only untracked fields writes no history and no changeset, so view counters and search vectors cost nothing.</p>
+<p>Fields keep their types through history. Values are stored as JSON: strings, numbers, booleans, arrays and <code>jsonb</code> as they are; dates, times and decimals as strings; anything else through <code>as_json</code>. They are cast back through the attribute's type when read.</p>
+<h2 id="models-scope">Scope</h2>
+<p><code>scope</code> gives every changeset about a record a scope string, such as the tenant or audience it belongs to. Reverts and reviews can then be limited to it:</p>
+<div class="sourceCode" id="models-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="models-cb3-1">versioned <span class="cf">do</span></span>
+<span id="models-cb3-2">  scope <span class="op">{</span> <span class="op">|</span>venue<span class="op">|</span> venue<span class="at">.audience_id</span> <span class="op">}</span></span>
+<span id="models-cb3-3"><span class="cf">end</span></span>
+<span id="models-cb3-4"></span>
+<span id="models-cb3-5"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Changeset</span><span class="at">.where</span>(<span class="wa">scope:</span> audience<span class="at">.id.to_s</span>)</span>
+<span id="models-cb3-6"><span class="dt">Retcon</span><span class="at">.revert_actor</span>(vandal, <span class="wa">actor:</span> staff, <span class="wa">scope:</span> audience<span class="at">.id.to_s</span>)</span></code></pre></div>
+<p>A changeset takes the scope of the first record it writes, unless <code>Retcon.changeset(scope:)</code> sets one.</p>
+<h2 id="models-merge-strategies">Merge strategies</h2>
+<p>When a proposal changes a field that someone else changed after the proposal's base, it conflicts. A merge strategy can settle that instead:</p>
+<ul>
+<li><code>:replace</code> (the default): it conflicts.</li>
+<li><code>:set_union</code>: for array fields, the result keeps every element either side has. Two people tagging the same venue both get their tags.</li>
+</ul>
+<div class="sourceCode" id="models-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="models-cb4-1">versioned <span class="cf">do</span></span>
+<span id="models-cb4-2">  merge <span class="wa">:tags</span>, <span class="wa">:set_union</span></span>
+<span id="models-cb4-3"><span class="cf">end</span></span></code></pre></div>
+<p>The merged value is written as one more version in the applied changeset, after the proposed one.</p>
+<h2 id="models-schema-versions">Schema versions</h2>
+<p><code>schema_version</code>, <code>rename_field</code> and <code>upcast</code> keep old history readable when columns change. See <a href="#schema-evolution">Schema evolution</a>.</p>
+<h2 id="models-associations-and-callbacks">Associations and callbacks</h2>
+<p>Saves and destroys are wrapped whole, so autosaved associations and <code>dependent: :destroy</code> children join the same changeset as their parent. Your callbacks run on ordinary saves. When retcon writes live rows itself (applying a proposal, reverting, rebuilding), it validates the record but skips callbacks. Check <code>Retcon.replaying?</code> in a callback that has side effects you never want to repeat, such as sending a notification:</p>
+<div class="sourceCode" id="models-cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="models-cb5-1">after_save <span class="wa">:notify_followers</span>, <span class="wa">unless:</span> <span class="op">-&gt;</span> <span class="op">{</span> <span class="dt">Retcon</span><span class="at">.replaying?</span> <span class="op">}</span></span></code></pre></div>
+<h2 id="models-instance-and-class-methods">Instance and class methods</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>record.retcon_versions</code></td>
+<td>every version row of the record, oldest first, proposals included</td>
+</tr>
+<tr>
+<td><code>record.retcon_heads</code></td>
+<td><code>{field =&gt; Head}</code> with the newest applied version of each field</td>
+</tr>
+<tr>
+<td><code>record.retcon_drifted?</code></td>
+<td>whether the live row was written outside retcon</td>
+</tr>
+<tr>
+<td><code>record.retcon_base = seq</code></td>
+<td>the base version the next save is checked against</td>
+</tr>
+<tr>
+<td><code>record.retcon_on_conflict = :skip</code></td>
+<td>leave conflicting fields out of the next save</td>
+</tr>
+<tr>
+<td><code>record.retcon_conflicts</code></td>
+<td>the fields the last save left out</td>
+</tr>
+<tr>
+<td><code>Model.retcon_state(id)</code></td>
+<td><code>{'exists', 'seq', 'attributes'}</code> as history says, or nil</td>
+</tr>
+<tr>
+<td><code>Model.retcon_revive!(id, actor:)</code></td>
+<td>brings a deleted record back with its id</td>
+</tr>
+<tr>
+<td><code>Model.retcon_rebuild!(id)</code></td>
+<td>rewrites the live row from history</td>
+</tr>
+<tr>
+<td><code>Model.retcon_sweep!</code></td>
+<td>catches up rows written outside retcon</td>
+</tr>
+<tr>
+<td><code>Model.retcon_genesis!</code></td>
+<td>gives pre-retcon rows their first history</td>
+</tr>
+</tbody>
+</table></div>
+</section><section id="changesets-and-actors"><h1>Changesets and actors</h1>
+<h2 id="changesets-and-actors-changesets">Changesets</h2>
+<p>A changeset is one logical change: version rows across any number of records and tables, with an author, a message and, once someone applies or decides it, a committer. Changesets are never deleted. Reverts and redactions are changesets too, so they can be inspected and undone like anything else.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>edit</code>, <code>proposal</code>, <code>genesis</code>, <code>catch_up</code>, <code>import</code>, <code>revert</code>, <code>redaction</code></td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>applied</code>, <code>proposed</code>, <code>rejected</code>, <code>withdrawn</code>, <code>amended</code></td>
+</tr>
+<tr>
+<td><code>author</code> / <code>committer</code></td>
+<td>who wrote it, and who applied or decided it</td>
+</tr>
+<tr>
+<td><code>applied_seq</code></td>
+<td>its place in retcon's global order of application</td>
+</tr>
+<tr>
+<td><code>parent</code></td>
+<td>the changeset this one amends, or the revert a review proposal came from</td>
+</tr>
+<tr>
+<td><code>scope</code></td>
+<td>the tenant or audience it belongs to (see <a href="#models">Models</a>)</td>
+</tr>
+<tr>
+<td><code>message</code>, <code>metadata</code></td>
+<td>free text, and a jsonb hash for your own keys</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every save outside <code>Retcon.changeset</code> gets a changeset of its own. Inside one, every save joins it, nested blocks included, and the whole block runs in one database transaction:</p>
+<div class="sourceCode" id="changesets-and-actors-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb1-1">changeset <span class="op">=</span> <span class="dt">Retcon</span><span class="at">.changeset</span>(<span class="wa">actor:</span> staff, <span class="wa">message:</span> <span class="vs">&#39;Merge duplicate venues&#39;</span>, <span class="wa">metadata:</span> <span class="op">{</span> <span class="vs">&#39;ticket&#39;</span> <span class="op">=&gt;</span> <span class="vs">&#39;OPS-12&#39;</span> <span class="op">}</span>) <span class="cf">do</span></span>
+<span id="changesets-and-actors-cb1-2">  keep<span class="at">.update!</span>(<span class="wa">phone:</span> dupe<span class="at">.phone</span>)</span>
+<span id="changesets-and-actors-cb1-3">  dupe<span class="at">.destroy!</span></span>
+<span id="changesets-and-actors-cb1-4"><span class="cf">end</span></span>
+<span id="changesets-and-actors-cb1-5">changeset<span class="at">.records</span>   <span class="co"># [[Venue, keep.id], [Venue, dupe.id]]</span></span>
+<span id="changesets-and-actors-cb1-6">changeset<span class="at">.versions</span>  <span class="co"># the version rows, in write order</span></span>
+<span id="changesets-and-actors-cb1-7">changeset<span class="at">.changes</span>   <span class="co"># {[Venue, keep.id] =&gt; {&#39;phone&#39; =&gt; &#39;555-0100&#39;}}</span></span></code></pre></div>
+<p>A block that changes nothing leaves no changeset and returns nil.</p>
+<h3 id="changesets-and-actors-global-order">Global order</h3>
+<p><code>applied_seq</code> comes from one PostgreSQL sequence, <code>retcon_seq</code>, shared by every versioned table. Every version row of an applied changeset carries the same <code>seq</code>, and the live row's <code>retcon_seq</code> is the seq of the last changeset that wrote it. That is what conflicts are checked against, and what lets reverts and rebuilds replay history in order.</p>
+<h2 id="changesets-and-actors-actors">Actors</h2>
+<p>History stores actor ids, never names or emails. An actor stands for a record, or is named:</p>
+<div class="sourceCode" id="changesets-and-actors-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb2-1"><span class="dt">Retcon</span><span class="at">.as</span>(current_user) <span class="op">{</span> <span class="op">...</span> <span class="op">}</span>                         <span class="co"># a record: a User, a device grant, an API client</span></span>
+<span id="changesets-and-actors-cb2-2"><span class="dt">Retcon</span><span class="at">.as</span>(<span class="dt">Retcon</span><span class="op">::</span><span class="dt">Actor</span><span class="at">.named</span>(<span class="vs">&#39;import&#39;</span>, <span class="vs">&#39;facebook&#39;</span>)) <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="changesets-and-actors-cb2-3"><span class="dt">Retcon</span><span class="at">.as</span>(<span class="vs">&#39;nightly-cleanup&#39;</span>) <span class="op">{</span> <span class="op">...</span> <span class="op">}</span>                     <span class="co"># a String names a system actor</span></span></code></pre></div>
+<p><code>Retcon::Actor.resolve</code> turns any of these into an <code>Actor</code> row, creating it the first time. Record actors are of kind <code>user</code> unless you map the class:</p>
+<div class="sourceCode" id="changesets-and-actors-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb3-1"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Actor</span><span class="at">.kinds</span> <span class="op">=</span> <span class="op">{</span> <span class="vs">&#39;VenueDeviceGrant&#39;</span> <span class="op">=&gt;</span> <span class="vs">&#39;device&#39;</span> <span class="op">}</span></span></code></pre></div>
+<p><code>actor.record</code> finds the record again; <code>actor.label</code> is how to show it (its pseudonym once redacted).</p>
+<h3 id="changesets-and-actors-agents">Agents</h3>
+<p>When software acts for a person (an assistant, a moderation bot acting on a report), attribute the change to both:</p>
+<div class="sourceCode" id="changesets-and-actors-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb4-1"><span class="dt">Retcon</span><span class="at">.as</span>(glam_bot, <span class="wa">on_behalf_of:</span> host) <span class="op">{</span> event<span class="at">.update!</span>(<span class="wa">status:</span> <span class="vs">&#39;cancelled&#39;</span>) <span class="op">}</span></span></code></pre></div>
+<p>The changeset's author is an <code>agent</code> actor that points at the person it acted for (<code>on_behalf_of</code>). Reverting the agent's changes, or the person's, finds them either way.</p>
+<h3 id="changesets-and-actors-unattributed-saves">Unattributed saves</h3>
+<p>Saves with no actor set are attributed to <code>Retcon::Actor.system</code> ("unattributed"), so nothing breaks while you add <code>Retcon.as</code> around your write paths. Turn that off once they're covered:</p>
+<div class="sourceCode" id="changesets-and-actors-cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb5-1"><span class="dt">Retcon</span><span class="at">.allow_unattributed</span> <span class="op">=</span> <span class="dv">false</span>   <span class="co"># saves with no actor raise Retcon::Error</span></span></code></pre></div>
+<p>A common place for <code>Retcon.as</code> is a controller <code>around_action</code>, or the GraphQL context for mutations.</p>
+<h2 id="changesets-and-actors-events">Events</h2>
+<p>retcon publishes through <code>ActiveSupport::Notifications</code> as <code>&lt;name&gt;.retcon</code>, with the changeset in the payload:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>proposal_opened</code></td>
+<td>a proposal (or an amended one) is opened</td>
+</tr>
+<tr>
+<td><code>changeset_applied</code></td>
+<td>a proposal is applied</td>
+</tr>
+<tr>
+<td><code>proposal_rejected</code></td>
+<td>a proposal is rejected</td>
+</tr>
+<tr>
+<td><code>revert_conflict</code></td>
+<td>a revert left same-field overlaps in a review proposal</td>
+</tr>
+<tr>
+<td><code>redacted</code></td>
+<td>a redaction is written</td>
+</tr>
+</tbody>
+</table></div>
+<div class="sourceCode" id="changesets-and-actors-cb6"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="changesets-and-actors-cb6-1"><span class="dt">Retcon</span><span class="at">.on</span>(<span class="wa">:proposal_opened</span>) <span class="op">{</span> <span class="op">|</span>changeset<span class="op">|</span> <span class="dt">ReviewQueue</span><span class="at">.route</span>(changeset) <span class="op">}</span></span></code></pre></div>
+<p>This is how you route proposals to reviewers, for example to a moderation host or a staff queue.</p>
+</section><section id="conflicts"><h1>Conflicts</h1>
+<p>Two people open the same venue. One fixes the phone number, the other the hours. Both save. With retcon both changes stay: conflicts are checked <strong>per field</strong>, and only when someone else changed that same field to a different value after the version you started from.</p>
+<h2 id="conflicts-the-base-version">The base version</h2>
+<p>Every live row carries <code>retcon_seq</code>, the seq of the last changeset that wrote it. A record remembers the <code>retcon_seq</code> it was loaded with; that is its <strong>base</strong>. On save, retcon:</p>
+<ol type="1">
+<li>locks the live row (<code>SELECT ... FOR UPDATE</code>) for the rest of the transaction;</li>
+<li>catches up any change written outside retcon since (see <a href="#drift">Drift</a>);</li>
+<li>compares each changed field's newest version with the base.</li>
+</ol>
+<p>A field conflicts when its newest version is newer than the base, came from someone else's change, and holds a value different from the one being saved.</p>
+<div class="sourceCode" id="conflicts-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="conflicts-cb1-1">mine <span class="op">=</span> <span class="dt">Venue</span><span class="at">.find</span>(id)      <span class="co"># base: seq 41</span></span>
+<span id="conflicts-cb1-2">theirs <span class="op">=</span> <span class="dt">Venue</span><span class="at">.find</span>(id)</span>
+<span id="conflicts-cb1-3"><span class="dt">Retcon</span><span class="at">.as</span>(bob) <span class="op">{</span> theirs<span class="at">.update!</span>(<span class="wa">phone:</span> <span class="vs">&#39;555-0199&#39;</span>) <span class="op">}</span>   <span class="co"># seq 42</span></span>
+<span id="conflicts-cb1-4"></span>
+<span id="conflicts-cb1-5"><span class="dt">Retcon</span><span class="at">.as</span>(alice) <span class="op">{</span> mine<span class="at">.update!</span>(<span class="wa">hours:</span> <span class="vs">&#39;4pm-2am&#39;</span>) <span class="op">}</span>    <span class="co"># fine: hours didn&#39;t move</span></span>
+<span id="conflicts-cb1-6"><span class="dt">Retcon</span><span class="at">.as</span>(alice) <span class="op">{</span> mine<span class="at">.update!</span>(<span class="wa">phone:</span> <span class="vs">&#39;555-0100&#39;</span>) <span class="op">}</span>   <span class="co"># Retcon::Conflict: phone changed at seq 42</span></span></code></pre></div>
+<p>Saving the value that's already there never conflicts.</p>
+<h2 id="conflicts-web-forms-an-explicit-base">Web forms: an explicit base</h2>
+<p>A record loaded inside the request that saves it has a base from moments ago. For an edit form, the base that matters is the one the person saw when the form was rendered. Put the record's <code>retcon_seq</code> in the form and give it back:</p>
+<div class="sourceCode" id="conflicts-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="conflicts-cb2-1"><span class="co"># the form: hidden_field :retcon_seq</span></span>
+<span id="conflicts-cb2-2">venue<span class="at">.retcon_base</span> <span class="op">=</span> params<span class="kw">[</span><span class="wa">:venue</span><span class="kw">][</span><span class="wa">:retcon_seq</span><span class="kw">]</span><span class="at">.to_i</span></span>
+<span id="conflicts-cb2-3">venue<span class="at">.update!</span>(venue_params)</span></code></pre></div>
+<p><code>retcon_base</code> also takes <code>{field =&gt; seq}</code> for clients that track versions per field. It applies to the next save only.</p>
+<h2 id="conflicts-handling-a-conflict">Handling a conflict</h2>
+<p>By default a conflict raises <code>Retcon::Conflict</code> and nothing is saved:</p>
+<div class="sourceCode" id="conflicts-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="conflicts-cb3-1"><span class="cf">rescue</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Conflict</span> <span class="op">=&gt;</span> e</span>
+<span id="conflicts-cb3-2">  e<span class="at">.conflicts.each</span> <span class="cf">do</span> <span class="op">|</span>c<span class="op">|</span></span>
+<span id="conflicts-cb3-3">    c<span class="at">.field</span>     <span class="co"># &#39;phone&#39;</span></span>
+<span id="conflicts-cb3-4">    c<span class="at">.current</span>   <span class="co"># what is there now: &#39;555-0199&#39;</span></span>
+<span id="conflicts-cb3-5">    c<span class="at">.proposed</span>  <span class="co"># what this save wanted: &#39;555-0100&#39;</span></span>
+<span id="conflicts-cb3-6">    c<span class="at">.base_seq</span>  <span class="co"># the version the edit started from</span></span>
+<span id="conflicts-cb3-7">    c<span class="at">.head_seq</span>  <span class="co"># the version that moved it</span></span>
+<span id="conflicts-cb3-8">  <span class="cf">end</span></span></code></pre></div>
+<p>Show the person both values and let them choose. Or save what you can and report the rest:</p>
+<div class="sourceCode" id="conflicts-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="conflicts-cb4-1">venue<span class="at">.retcon_on_conflict</span> <span class="op">=</span> <span class="wa">:skip</span></span>
+<span id="conflicts-cb4-2">venue<span class="at">.update!</span>(<span class="wa">phone:</span> <span class="vs">&#39;555-0100&#39;</span>, <span class="wa">hours:</span> <span class="vs">&#39;4pm-2am&#39;</span>)</span>
+<span id="conflicts-cb4-3">venue<span class="at">.retcon_conflicts</span>   <span class="co"># [FieldConflict(phone)]: hours saved, phone left as it was</span></span></code></pre></div>
+<p>Skipped fields are put back to their database value on the record.</p>
+<h2 id="conflicts-proposals">Proposals</h2>
+<p>Proposals record their base when they're opened and are checked when they're applied, days later perhaps. The same rules apply, plus <a href="#models">merge strategies</a> for fields like tags. See <a href="#proposals">Proposals</a>.</p>
+</section><section id="proposals"><h1>Proposals</h1>
+<p>A proposal is a changeset that hasn't been applied: updates, creates and destroys recorded against base versions, reviewed, then applied or rejected. It touches no live table until it is applied, so readers never see it.</p>
+<h2 id="proposals-opening-one">Opening one</h2>
+<div class="sourceCode" id="proposals-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="proposals-cb1-1">proposal <span class="op">=</span> <span class="dt">Retcon</span><span class="at">.propose</span>(<span class="wa">actor:</span> member, <span class="wa">message:</span> <span class="vs">&#39;New hours&#39;</span>) <span class="cf">do</span> <span class="op">|</span><span class="fu">p</span><span class="op">|</span></span>
+<span id="proposals-cb1-2">  <span class="fu">p</span><span class="at">.update</span>(venue, <span class="wa">hours:</span> <span class="vs">&#39;Tue-Sun 4pm-2am&#39;</span>)</span>
+<span id="proposals-cb1-3">  <span class="fu">p</span><span class="at">.create</span>(<span class="dt">Event</span>, <span class="wa">venue_id:</span> venue<span class="at">.id</span>, <span class="wa">name:</span> <span class="vs">&#39;Drag Bingo&#39;</span>)</span>
+<span id="proposals-cb1-4">  <span class="fu">p</span><span class="at">.destroy</span>(old_event)</span>
+<span id="proposals-cb1-5"><span class="cf">end</span></span>
+<span id="proposals-cb1-6">proposal<span class="at">.state</span>      <span class="co"># &#39;proposed&#39;</span></span>
+<span id="proposals-cb1-7">proposal<span class="at">.changes</span>    <span class="co"># the diff to show a reviewer</span></span></code></pre></div>
+<ul>
+<li><code>p.update(record, fields)</code> proposes new values. Its base is the version the record was loaded at, or pass <code>base: seq</code> (or <code>{field =&gt; seq}</code>) for the version the proposer saw.</li>
+<li><code>p.create(Model, attributes)</code> proposes a new record. Its id is chosen now (a UUID, or the next value of the table's sequence), so other parts of the same proposal can refer to it. It returns the unsaved record.</li>
+<li><code>p.destroy(record)</code> proposes deleting it.</li>
+</ul>
+<p>Only versioned fields can be proposed. A proposal that changes nothing raises <code>ArgumentError</code>.</p>
+<h2 id="proposals-reviewing">Reviewing</h2>
+<div class="sourceCode" id="proposals-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="proposals-cb2-1">proposal<span class="at">.apply!</span>(<span class="wa">committer:</span> reviewer)</span>
+<span id="proposals-cb2-2">proposal<span class="at">.reject!</span>(<span class="wa">by:</span> reviewer, <span class="wa">reason:</span> <span class="vs">&#39;Hours are wrong&#39;</span>)</span>
+<span id="proposals-cb2-3">proposal<span class="at">.withdraw!</span>                           <span class="co"># the author takes it back</span></span>
+<span id="proposals-cb2-4">amended <span class="op">=</span> proposal<span class="at">.amend!</span>(<span class="wa">by:</span> reviewer) <span class="cf">do</span> <span class="op">|</span><span class="fu">p</span><span class="op">|</span></span>
+<span id="proposals-cb2-5">  <span class="fu">p</span><span class="at">.update</span>(venue, <span class="wa">hours:</span> <span class="vs">&#39;Tue-Sun 5pm-2am&#39;</span>)  <span class="co"># replaces the original&#39;s value for this field</span></span>
+<span id="proposals-cb2-6"><span class="cf">end</span></span></code></pre></div>
+<p><code>apply!</code> runs in one transaction: it locks the proposal, locks and catches up each record, checks every field against its base, writes the live rows, and marks the version rows applied with a fresh seq. Live rows are validated (an invalid result raises <code>Retcon::Invalid</code>), and model callbacks don't run (see <code>Retcon.replaying?</code> in <a href="#models">Models</a>).</p>
+<p>If fields conflict, <code>apply!</code> raises <code>Retcon::Conflict</code> and applies nothing. To apply the rest:</p>
+<div class="sourceCode" id="proposals-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="proposals-cb3-1">result <span class="op">=</span> proposal<span class="at">.apply!</span>(<span class="wa">committer:</span> reviewer, <span class="wa">on_conflict:</span> <span class="wa">:skip</span>)</span>
+<span id="proposals-cb3-2">result<span class="kw">[</span><span class="wa">:conflicts</span><span class="kw">]</span>   <span class="co"># [FieldConflict]; also kept in the changeset&#39;s metadata as &#39;skipped&#39;</span></span></code></pre></div>
+<p>Skipped fields stay in the applied changeset unapplied, so history shows what was proposed and not taken.</p>
+<p><code>amend!</code> keeps the author, makes the reviewer the committer, points the new proposal's <code>parent</code> at the original and marks the original <code>amended</code>.</p>
+<h2 id="proposals-policy-commit-propose-or-deny">Policy: commit, propose or deny</h2>
+<p><code>Retcon.edit</code> sends an edit through a policy you define. Trusted editors commit directly, others open a proposal:</p>
+<div class="sourceCode" id="proposals-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="proposals-cb4-1"><span class="dt">Retcon</span><span class="at">.policy</span> <span class="op">=</span> <span class="fu">lambda</span> <span class="cf">do</span> <span class="op">|</span>actor, record, changes<span class="op">|</span></span>
+<span id="proposals-cb4-2">  <span class="cf">next</span> <span class="wa">:deny</span> <span class="cf">if</span> actor<span class="at">.record</span><span class="op">&amp;</span><span class="at">.banned?</span></span>
+<span id="proposals-cb4-3">  <span class="cf">next</span> <span class="wa">:commit</span> <span class="cf">if</span> actor<span class="at">.record</span><span class="op">&amp;</span><span class="at">.staff?</span> <span class="op">||</span> record<span class="at">.try</span>(<span class="wa">:owner_id</span>) <span class="op">==</span> actor<span class="at">.record</span><span class="op">&amp;</span><span class="at">.id</span></span>
+<span id="proposals-cb4-4"></span>
+<span id="proposals-cb4-5">  <span class="wa">:propose</span></span>
+<span id="proposals-cb4-6"><span class="cf">end</span></span>
+<span id="proposals-cb4-7"></span>
+<span id="proposals-cb4-8"><span class="dt">Retcon</span><span class="at">.edit</span>(venue, <span class="op">{</span> <span class="wa">phone:</span> <span class="vs">&#39;555-0100&#39;</span> <span class="op">}</span>, <span class="wa">actor:</span> current_user, <span class="wa">base:</span> params<span class="kw">[</span><span class="wa">:retcon_seq</span><span class="kw">]</span><span class="at">.to_i</span>)</span></code></pre></div>
+<p><code>changes</code> is <code>{field =&gt; [from, to]}</code>. The policy returns <code>:commit</code> (an applied changeset), <code>:propose</code> (a proposal; the record is left unchanged) or <code>:deny</code> (raises <code>Retcon::Denied</code>). Trust tiers, matching rules and rate limits all fit here.</p>
+<h2 id="proposals-routing-reviews">Routing reviews</h2>
+<p>Subscribe to <code>proposal_opened</code> to send proposals where they belong:</p>
+<div class="sourceCode" id="proposals-cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="proposals-cb5-1"><span class="dt">Retcon</span><span class="at">.on</span>(<span class="wa">:proposal_opened</span>) <span class="cf">do</span> <span class="op">|</span>proposal<span class="op">|</span></span>
+<span id="proposals-cb5-2">  <span class="dt">ModerationQueue</span><span class="at">.enqueue</span>(proposal, <span class="wa">scope:</span> proposal<span class="at">.scope</span>)</span>
+<span id="proposals-cb5-3"><span class="cf">end</span></span></code></pre></div>
+<h2 id="proposals-proposed-rows-in-history">Proposed rows in history</h2>
+<p>A proposal's version rows sit in the history tables with <code>applied</code> false and no seq. Heads, state and rebuilds only count applied rows, so an open proposal never changes what history says a record is.</p>
+</section><section id="reverts"><h1>Reverts</h1>
+<p>A revert undoes changesets the way an interactive rebase drops commits, without rewriting history: one new changeset of kind <code>revert</code> puts back what the dropped changesets replaced, and later work by others stays.</p>
+<div class="sourceCode" id="reverts-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="reverts-cb1-1"><span class="dt">Retcon</span><span class="at">.revert</span>(changeset, <span class="wa">actor:</span> staff)</span>
+<span id="reverts-cb1-2">changeset<span class="at">.revert!</span>(<span class="wa">actor:</span> staff)                                  <span class="co"># the same</span></span>
+<span id="reverts-cb1-3"><span class="dt">Retcon</span><span class="at">.revert_actor</span>(vandal, <span class="wa">actor:</span> staff)                        <span class="co"># everything they authored</span></span>
+<span id="reverts-cb1-4"><span class="dt">Retcon</span><span class="at">.revert_actor</span>(vandal, <span class="wa">actor:</span> staff, <span class="wa">since:</span> <span class="dv">2</span><span class="at">.days.ago</span>, <span class="wa">scope:</span> audience<span class="at">.id.to_s</span>)</span></code></pre></div>
+<p><code>revert_actor</code> takes every applied changeset the actor authored, leaving out their own reverts and redactions.</p>
+<h2 id="reverts-what-a-revert-does">What a revert does</h2>
+<p>For each field the dropped changesets set:</p>
+<ul>
+<li>if a dropped changeset wrote the field's current value, the field goes back to the newest value written by a changeset that isn't dropped (nil when there is none);</li>
+<li>if someone else changed it afterwards, their value stays, and restoring the earlier value goes into a <strong>review proposal</strong> instead. This is a same-field overlap: a person decides.</li>
+</ul>
+<p>Records the dropped changesets created are deleted (tombstoned). Records they deleted are revived, with their id and history. Fields nobody else touched are restored directly.</p>
+<div class="sourceCode" id="reverts-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="reverts-cb2-1">result <span class="op">=</span> <span class="dt">Retcon</span><span class="at">.revert_actor</span>(vandal, <span class="wa">actor:</span> staff)</span>
+<span id="reverts-cb2-2">result<span class="at">.revert</span>    <span class="co"># the applied revert changeset, or nil when there was nothing to undo</span></span>
+<span id="reverts-cb2-3">result<span class="at">.review</span>    <span class="co"># a proposal with the overlaps, or nil; its parent is the revert</span></span>
+<span id="reverts-cb2-4">result<span class="at">.flagged</span>   <span class="co"># [Actor] reviewers who applied the vandal&#39;s proposals</span></span></code></pre></div>
+<p><code>flagged</code> lists committers who applied a dropped changeset someone else authored. They approved the damage, so whoever cleans up may want to look at what else they approved.</p>
+<p>The review proposal fires <code>revert_conflict</code> as well as <code>proposal_opened</code>, so it can be routed like any proposal.</p>
+<h2 id="reverts-undoing-a-revert">Undoing a revert</h2>
+<p>A revert is a changeset, so it can be reverted. That puts the dropped changes back, with the same rules about later work.</p>
+<h2 id="reverts-reviving-one-record">Reviving one record</h2>
+<p>To bring back a single deleted record without reverting anything else:</p>
+<div class="sourceCode" id="reverts-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="reverts-cb3-1"><span class="dt">Venue</span><span class="at">.retcon_revive!</span>(venue_id, <span class="wa">actor:</span> staff)</span></code></pre></div>
+<p>It reinserts the row with its id, every column from the tombstone snapshot and each field's newest version, as a changeset of its own (or in the open one). Reviving a record that is live raises <code>Retcon::Error</code>.</p>
+<h2 id="reverts-rebuilding">Rebuilding</h2>
+<p>Because live rows are a projection, any row can be rewritten from history:</p>
+<div class="sourceCode" id="reverts-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="reverts-cb4-1"><span class="dt">Venue</span><span class="at">.retcon_rebuild!</span>(venue_id)   <span class="co"># inserts, updates or deletes the live row to match history</span></span>
+<span id="reverts-cb4-2"><span class="dt">Retcon</span><span class="at">.verify</span>(<span class="dt">Venue</span>, <span class="wa">sample:</span> <span class="dv">500</span>) <span class="co"># [[id, field, live, history], ...] for rows that disagree; empty when they agree</span></span></code></pre></div>
+</section><section id="drift"><h1>Drift and bulk writes</h1>
+<p>Not every write goes through a model save. <code>update_all</code>, <code>insert_all</code>, <code>update_column</code>, raw SQL and console fixes all write live rows without history. retcon finds them and records them before anything builds on them, attributed to <code>Retcon::Actor.untracked</code>, so history never silently disagrees with the live table.</p>
+<h2 id="drift-how-drift-is-found">How drift is found</h2>
+<p><code>version_table</code> installs a trigger on the live table that sets <code>retcon_dirty</code> on any insert or update retcon didn't make. retcon's own writes set the <code>retcon.writing</code> setting for the transaction, so the trigger leaves them alone.</p>
+<p>Drift is caught three ways:</p>
+<ul>
+<li><strong>On write.</strong> Before every update and destroy, retcon locks the row and, if it is dirty, writes a <code>catch_up</code> changeset with what changed. Your edit then goes in after it, in order.</li>
+<li><strong>Sweeps.</strong> <code>Venue.retcon_sweep!</code> catches up every dirty row in batches, and records rows deleted outside retcon (history says they exist, the live table has none) as tombstones. Run it from a scheduled job.</li>
+<li><strong>Full sweeps.</strong> <code>Venue.retcon_sweep!(full: true)</code> also compares every row's digest of its versioned fields with the one retcon wrote. That catches writes made with the trigger disabled. It reads the whole table, so run it rarely.</li>
+</ul>
+<p>Rows with no history at all are pre-retcon data and get <code>genesis</code> changesets instead.</p>
+<div class="sourceCode" id="drift-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="drift-cb1-1"><span class="dt">Venue</span><span class="at">.retcon_sweep!</span>                          <span class="co"># =&gt; number of rows caught up</span></span>
+<span id="drift-cb1-2">venue<span class="at">.retcon_drifted?</span>                        <span class="co"># one row</span></span></code></pre></div>
+<h2 id="drift-skipping-history-on-purpose">Skipping history on purpose</h2>
+<div class="sourceCode" id="drift-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="drift-cb2-1"><span class="dt">Retcon</span><span class="at">.bypass</span> <span class="op">{</span> <span class="dt">Venue</span><span class="at">.where</span>(<span class="wa">audience_id:</span> old)<span class="at">.update_all</span>(<span class="wa">audience_id:</span> new) <span class="op">}</span></span></code></pre></div>
+<p>Writes in a bypass block skip history, but the trigger still marks the rows dirty, so the next sweep records them as untracked changes. Use bypass for migrations and repairs where attribution doesn't matter.</p>
+<h2 id="drift-bulk-writes-with-attribution">Bulk writes with attribution</h2>
+<p>Imports and syncs that would use <code>upsert_all</code> can keep attribution with <code>Retcon::Bulk.upsert</code>:</p>
+<div class="sourceCode" id="drift-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="drift-cb3-1"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Bulk</span><span class="at">.upsert</span>(<span class="dt">Venue</span>, rows, <span class="wa">unique_by:</span> <span class="wa">:external_key</span>, <span class="wa">actor:</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Actor</span><span class="at">.named</span>(<span class="vs">&#39;import&#39;</span>, <span class="vs">&#39;facebook&#39;</span>))</span></code></pre></div>
+<p>Rows are matched to live rows by <code>unique_by</code> (one column or several). New rows are created, matched rows get only the fields that differ, and everything lands in one changeset of kind <code>import</code>. Like <code>upsert_all</code>, validations and callbacks don't run. It returns the changeset, or nil when nothing changed.</p>
+</section><section id="redaction"><h1>Redaction</h1>
+<p>Some things history must not keep: a phone number posted by mistake, a privacy or right-to-be-forgotten request, a takedown. Redaction is the one place retcon changes history rows, and it changes them only to delete a value.</p>
+<h2 id="redaction-commitments">Commitments</h2>
+<p>Every version row holds its value, a random salt, and a <strong>commitment</strong>: SHA-256 over the salt and the value's canonical JSON. Redaction deletes the value and the salt and keeps the commitment. History still verifies (each row proves a value existed, and which changeset wrote it), but the value is gone, and because the salt is gone too, a short value like a phone number can't be guessed back by hashing candidates.</p>
+<div class="sourceCode" id="redaction-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="redaction-cb1-1">row<span class="at">.verified?</span>   <span class="co"># the commitment matches the value (true once redacted: nothing left to check)</span></span></code></pre></div>
+<h2 id="redaction-scrubbing-a-field">Scrubbing a field</h2>
+<div class="sourceCode" id="redaction-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="redaction-cb2-1"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Redaction</span><span class="at">.field</span>(venue, <span class="wa">:phone</span>, <span class="wa">actor:</span> staff, <span class="wa">reason:</span> <span class="vs">&#39;privacy request&#39;</span>)</span></code></pre></div>
+<p>This scrubs the field from every version of the record, applied or proposed, and removes it from the record's tombstone snapshots. Options:</p>
+<ul>
+<li><code>value:</code> scrub only versions holding this value, leaving the field's other history alone.</li>
+<li><code>remedy:</code> the live value afterwards (nil by default), written as a new version so a rebuild lands on it. Pass <code>Retcon::Redaction::KEEP</code> to leave the live value alone when it is already clean.</li>
+</ul>
+<div class="sourceCode" id="redaction-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="redaction-cb3-1"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Redaction</span><span class="at">.field</span>(venue, <span class="wa">:phone</span>, <span class="wa">actor:</span> staff, <span class="wa">reason:</span> <span class="vs">&#39;posted by mistake&#39;</span>, <span class="wa">value:</span> <span class="vs">&#39;555-0100&#39;</span>,</span>
+<span id="redaction-cb3-2">                                       <span class="wa">remedy:</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Redaction</span><span class="op">::</span><span class="cn">KEEP</span>)</span></code></pre></div>
+<p>Every redaction is a changeset of kind <code>redaction</code> recording who, when, why and which version rows, never what was removed. It fires the <code>redacted</code> event.</p>
+<h2 id="redaction-pseudonymizing-an-editor">Pseudonymizing an editor</h2>
+<div class="sourceCode" id="redaction-cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="redaction-cb4-1"><span class="dt">Retcon</span><span class="op">::</span><span class="dt">Redaction</span><span class="at">.editor</span>(user, <span class="wa">by:</span> staff, <span class="wa">reason:</span> <span class="vs">&#39;account deleted&#39;</span>)</span></code></pre></div>
+<p>History stores actor ids, so this rewrites one actor row: their identity is replaced with a stable pseudonym such as <code>editor-3f9a1c2b</code>. Their edits stay, grouped under the pseudonym, so they can still be audited and reverted.</p>
+<h2 id="redaction-deletion-requests">Deletion requests</h2>
+<div class="sourceCode" id="redaction-cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="redaction-cb5-1">result <span class="op">=</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Redaction</span><span class="at">.erase</span>(user, <span class="wa">by:</span> deletion_job, <span class="wa">reason:</span> <span class="vs">&#39;deletion request&#39;</span>)</span></code></pre></div>
+<p>For an automated personal deletion request, <code>erase</code> does three things in one transaction:</p>
+<ol type="1">
+<li>reverts everything the person authored (see <a href="#reverts">Reverts</a>);</li>
+<li>scrubs every value they wrote from history;</li>
+<li>pseudonymizes them.</li>
+</ol>
+<p>Later edits by other people to the same fields are not touched: they come back in <code>result[:review]</code> as a proposal, because a deletion request can't wipe other people's work. The result is <code>{ revert:, review:, flagged:, redaction: }</code>.</p>
+</section><section id="edges"><h1>Edges</h1>
+<p>Relationships between records (an episode recorded at an event, a person hosting a night) are often rows in a link table whose identity is the triple <strong>subject, predicate, object</strong>. <code>Retcon::Edge</code> versions them like any record and adds two rules: linking the same triple again revives the row it had, and removed edges leave the live table.</p>
+<div class="sourceCode" id="edges-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="edges-cb1-1"><span class="cf">class</span> <span class="dt">EntityLink</span> <span class="op">&lt;</span> <span class="dt">ApplicationRecord</span></span>
+<span id="edges-cb1-2">  <span class="fu">include</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Edge</span></span>
+<span id="edges-cb1-3"></span>
+<span id="edges-cb1-4">  retcon_triple <span class="wa">subject:</span> <span class="op">%</span>i<span class="kw">[</span>item_type item_id<span class="kw">]</span>, <span class="wa">predicate:</span> <span class="wa">:predicate</span>, <span class="wa">object:</span> <span class="op">%</span>i<span class="kw">[</span>target_type target_id<span class="kw">]</span></span>
+<span id="edges-cb1-5"><span class="cf">end</span></span></code></pre></div>
+<p>A polymorphic end is <code>[type_column, id_column]</code>; a plain end is one id column. Give the table a unique index on the triple. <code>discriminator:</code> names one more identifying column, for a triple that may appear more than once (two slots on the same night, say).</p>
+<h2 id="edges-linking-and-unlinking">Linking and unlinking</h2>
+<div class="sourceCode" id="edges-cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="edges-cb2-1"><span class="dt">EntityLink</span><span class="at">.link!</span>(episode, <span class="wa">:recorded_at</span>, event, <span class="wa">status:</span> <span class="vs">&#39;linked&#39;</span>)   <span class="co"># creates, updates or revives</span></span>
+<span id="edges-cb2-2"><span class="dt">EntityLink</span><span class="at">.unlink!</span>(episode, <span class="wa">:recorded_at</span>, event)                   <span class="co"># tombstones; nil when there was no edge</span></span></code></pre></div>
+<p><code>link!</code> updates a live edge in place, writing a version only for attributes that changed. If the triple was linked before and removed, it revives that row, keeping its id and its whole history, instead of starting a new one. It finds the old row through the tombstone snapshots, with a jsonb containment query on the history table's GIN index.</p>
+<h2 id="edges-walking-the-graph">Walking the graph</h2>
+<p>Removed edges leave the live table, so anything that reads the live table, including <a href="https://lwm-luminx.github.io/graph_query/">graph_query</a>, walks only live edges with no extra filter:</p>
+<div class="sourceCode" id="edges-cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="edges-cb3-1"><span class="cf">class</span> <span class="dt">MediaEpisode</span> <span class="op">&lt;</span> <span class="dt">ApplicationRecord</span></span>
+<span id="edges-cb3-2">  graph_edge <span class="wa">:recorded_at</span>, <span class="wa">to:</span> <span class="dt">Event</span>, <span class="wa">through:</span> <span class="dt">EntityLink</span>, <span class="wa">source:</span> <span class="wa">:item_id</span>, <span class="wa">target:</span> <span class="wa">:target_id</span>,</span>
+<span id="edges-cb3-3">                           <span class="wa">where:</span> <span class="op">{</span> <span class="wa">item_type:</span> <span class="vs">&#39;MediaEpisode&#39;</span>, <span class="wa">predicate:</span> <span class="vs">&#39;recorded_at&#39;</span>, <span class="wa">target_type:</span> <span class="vs">&#39;Event&#39;</span> <span class="op">}</span></span>
+<span id="edges-cb3-4"><span class="cf">end</span></span></code></pre></div>
+<p>graph_query sees only the links that exist now. Who linked or unlinked an edge, and when, is in its history like any other record.</p>
+</section><section id="schema-evolution"><h1>Schema evolution</h1>
+<p>History outlives your schema. A column renamed today still has years of versions under its old name. retcon stamps every version row with the model's <strong>schema version</strong> and reads old rows through <strong>upcasters</strong>, so history never has to be rewritten when a column changes.</p>
+<h2 id="schema-evolution-versions-and-upcasters">Versions and upcasters</h2>
+<p>Bump <code>schema_version</code> in the same deploy as the migration, and say how older rows read:</p>
+<div class="sourceCode" id="schema-evolution-cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span id="schema-evolution-cb1-1"><span class="cf">class</span> <span class="dt">Venue</span> <span class="op">&lt;</span> <span class="dt">ApplicationRecord</span></span>
+<span id="schema-evolution-cb1-2">  <span class="fu">include</span> <span class="dt">Retcon</span><span class="op">::</span><span class="dt">Model</span></span>
+<span id="schema-evolution-cb1-3"></span>
+<span id="schema-evolution-cb1-4">  versioned <span class="cf">do</span></span>
+<span id="schema-evolution-cb1-5">    schema_version <span class="dv">3</span></span>
+<span id="schema-evolution-cb1-6">    rename_field <span class="wa">:hours_text</span>, <span class="wa">:hours</span>, <span class="wa">before:</span> <span class="dv">2</span>     <span class="co"># rows written under version 1</span></span>
+<span id="schema-evolution-cb1-7">    upcast(<span class="wa">before:</span> <span class="dv">3</span>) <span class="cf">do</span> <span class="op">|</span>field, value<span class="op">|</span>             <span class="co"># rows written under versions 1 and 2</span></span>
+<span id="schema-evolution-cb1-8">      <span class="cf">next</span> <span class="kw">[]</span> <span class="cf">if</span> field <span class="op">==</span> <span class="vs">&#39;legacy_rating&#39;</span>           <span class="co"># dropped</span></span>
+<span id="schema-evolution-cb1-9">      <span class="cf">next</span> <span class="kw">[[</span><span class="vs">&#39;city&#39;</span>, value<span class="kw">[</span><span class="vs">&#39;city&#39;</span><span class="kw">]]</span>, <span class="kw">[</span><span class="vs">&#39;region&#39;</span>, value<span class="kw">[</span><span class="vs">&#39;region&#39;</span><span class="kw">]]]</span> <span class="cf">if</span> field <span class="op">==</span> <span class="vs">&#39;location&#39;</span>   <span class="co"># split</span></span>
+<span id="schema-evolution-cb1-10"></span>
+<span id="schema-evolution-cb1-11">      <span class="kw">[[</span>field, value<span class="kw">]]</span></span>
+<span id="schema-evolution-cb1-12">    <span class="cf">end</span></span>
+<span id="schema-evolution-cb1-13">  <span class="cf">end</span></span>
+<span id="schema-evolution-cb1-14"><span class="cf">end</span></span></code></pre></div>
+<p>An upcaster takes <code>(field, value)</code> and returns <code>[[field, value], ...]</code>: one pair to keep or rename, none to drop, several to split. Upcasters run in order of <code>before:</code>, and only on rows written under an older version, so a row from version 1 goes through both of the upcasters above.</p>
+<p>Heads, state, conflict checks and rebuilds all read through upcasters. The rows themselves keep what was written, and <code>row.raw_value</code> returns it.</p>
+<h2 id="schema-evolution-changing-columns">Changing columns</h2>
+<ul>
+<li><strong>Adding a versioned column:</strong> nothing to do. Existing records have no versions for it until it changes. If the migration backfills it with SQL, the trigger marks those rows dirty and <code>Venue.retcon_sweep!</code> records the values.</li>
+<li><strong>Removing a column:</strong> add an upcaster that drops it, or <code>ignore</code> it first and remove it later.</li>
+<li><strong>Renaming:</strong> <code>rename_field</code> with the new schema version.</li>
+<li><strong>Changing a type:</strong> history keeps JSON values; an upcaster can convert old ones.</li>
+</ul>
+<h2 id="schema-evolution-live-columns">Live columns</h2>
+<p><code>version_table</code> adds three columns to the live table. Keep them out of your forms and serializers:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>retcon_seq</code></td>
+<td>the seq of the last changeset that wrote the row: its base version</td>
+</tr>
+<tr>
+<td><code>retcon_digest</code></td>
+<td>a digest of the versioned fields as retcon last wrote them</td>
+</tr>
+<tr>
+<td><code>retcon_dirty</code></td>
+<td>set by the trigger when the row is written outside retcon</td>
+</tr>
+</tbody>
+</table></div>
+</section><section id="internals"><h1>Internals</h1>
+<h2 id="internals-tables">Tables</h2>
+<p><code>create_retcon_tables</code> makes:</p>
+<ul>
+<li>the sequence <code>retcon_seq</code>, retcon's global order of application;</li>
+<li><code>retcon_actors</code>: kind, the record an actor stands for (<code>ref_type</code>, <code>ref_id</code>), a name, <code>on_behalf_of_id</code> for agents, and the pseudonym and <code>redacted_at</code> once redacted;</li>
+<li><code>retcon_changesets</code>: kind, state, author, committer, parent, scope, message, metadata, <code>applied_seq</code>, and when it was applied and decided.</li>
+</ul>
+<p><code>version_table :venues</code> makes <code>retcon_venues</code>, with one row per field change or lifecycle step:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>changeset_id</code></td>
+<td>the changeset the row belongs to</td>
+</tr>
+<tr>
+<td><code>record_id</code></td>
+<td>the live row's id, in the live table's key type</td>
+</tr>
+<tr>
+<td><code>op</code></td>
+<td><code>set</code>, or a lifecycle step: <code>create</code>, <code>tombstone</code>, <code>revive</code></td>
+</tr>
+<tr>
+<td><code>field</code>, <code>value</code></td>
+<td>for <code>set</code>: the field and <code>{"v": value}</code>; for a tombstone, the row as it was</td>
+</tr>
+<tr>
+<td><code>salt</code>, <code>commitment</code></td>
+<td>for <code>set</code>: the salted SHA-256 commitment that survives redaction</td>
+</tr>
+<tr>
+<td><code>applied</code>, <code>seq</code></td>
+<td>whether the changeset is applied, and its seq</td>
+</tr>
+<tr>
+<td><code>base_seq</code></td>
+<td>the version the change was made against</td>
+</tr>
+<tr>
+<td><code>schema_version</code></td>
+<td>the model's schema version when written</td>
+</tr>
+<tr>
+<td><code>redacted_by_id</code></td>
+<td>the redaction changeset that scrubbed the value</td>
+</tr>
+</tbody>
+</table></div>
+<p>History rows are inserted, never updated or deleted, except when a proposal is applied (<code>applied</code>, <code>seq</code>) and when redaction scrubs a value and salt.</p>
+<h2 id="internals-one-transaction">One transaction</h2>
+<p>A save writes the changeset, the live row and the history rows in one transaction, in that order:</p>
+<ol type="1">
+<li>lock the live row and catch up drift;</li>
+<li>check conflicts against the base;</li>
+<li>take the changeset's seq (on its first write), set the live row's <code>retcon_seq</code>, digest and dirty flag, and save;</li>
+<li>write the history rows for the fields that changed.</li>
+</ol>
+<p>If anything raises, the transaction rolls back and neither history nor the live row changes. A catch-up that happens inside an open changeset renumbers that changeset after itself, so history orders the catch-up first.</p>
+<h2 id="internals-replaying">Replaying</h2>
+<p>When retcon writes live rows from history (applying, reverting, reviving, rebuilding), it runs validations with <code>Retcon.replaying?</code> true and writes with SQL, so callbacks don't fire for changes that are old or were reviewed. Subscribe to <code>changeset_applied</code> for side effects that should follow these writes.</p>
+<h2 id="internals-cost">Cost</h2>
+<p>A save of N changed fields adds one changeset insert (per changeset, not per record), one multi-row history insert, one row lock and one <code>DISTINCT ON</code> query for the record's field heads. Reads of live tables are unchanged.</p>
+</section><section id="reference"><h1>Reference</h1>
+<h2 id="reference-retcon">Retcon</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Retcon.as(actor, on_behalf_of: nil) { }</code></td>
+<td>attributes every change in the block</td>
+</tr>
+<tr>
+<td><code>Retcon.actor</code></td>
+<td>the current actor, or nil</td>
+</tr>
+<tr>
+<td><code>Retcon.changeset(actor:, message:, scope:, kind:, metadata:) { }</code></td>
+<td>one applied changeset, one transaction; returns it</td>
+</tr>
+<tr>
+<td><code>Retcon.propose(actor:, message:, scope:, metadata:) { |p| }</code></td>
+<td>opens a proposal; returns it</td>
+</tr>
+<tr>
+<td><code>Retcon.edit(record, attributes, actor:, message:, base:)</code></td>
+<td>commits, proposes or denies through the policy</td>
+</tr>
+<tr>
+<td><code>Retcon.policy = -&gt;(actor, record, changes) { }</code></td>
+<td>returns <code>:commit</code>, <code>:propose</code> or <code>:deny</code></td>
+</tr>
+<tr>
+<td><code>Retcon.revert(changesets, actor:, message:)</code></td>
+<td>returns a <code>Revert::Result</code></td>
+</tr>
+<tr>
+<td><code>Retcon.revert_actor(actor, actor:, since:, scope:, message:)</code></td>
+<td>reverts what an actor authored</td>
+</tr>
+<tr>
+<td><code>Retcon.bypass { }</code></td>
+<td>writes skip history (and are swept later)</td>
+</tr>
+<tr>
+<td><code>Retcon.verify(model, sample: 100)</code></td>
+<td>live rows that disagree with history</td>
+</tr>
+<tr>
+<td><code>Retcon.replaying?</code></td>
+<td>true while retcon writes live rows from history</td>
+</tr>
+<tr>
+<td><code>Retcon.on(event) { |changeset| }</code></td>
+<td>subscribes to an event</td>
+</tr>
+<tr>
+<td><code>Retcon.allow_unattributed = false</code></td>
+<td>saves with no actor raise</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="reference-retconchangeset">Retcon::Changeset</h2>
+<p><code>versions</code>, <code>records</code>, <code>changes</code>, <code>apply!(committer:, on_conflict: :raise)</code>, <code>reject!(by:, reason:)</code>, <code>withdraw!(by:)</code>, <code>amend!(by:, message:) { |p| }</code>, <code>revert!(actor:, message:)</code>. Scopes: <code>applied</code>, <code>proposed</code>.</p>
+<h2 id="reference-retconproposalbuilder">Retcon::Proposal::Builder</h2>
+<p><code>update(record, fields, base: nil)</code>, <code>create(model, attributes)</code>, <code>destroy(record)</code>.</p>
+<h2 id="reference-retconactor">Retcon::Actor</h2>
+<p><code>Actor.resolve(thing, on_behalf_of: nil)</code>, <code>Actor.named(kind, name)</code>, <code>Actor.system</code>, <code>Actor.untracked</code>, <code>Actor.kinds = {}</code>, <code>#record</code>, <code>#label</code>, <code>#redacted?</code>, <code>#pseudonymize!</code>.</p>
+<h2 id="reference-retconredaction">Retcon::Redaction</h2>
+<p><code>field(record, field, actor:, reason:, value: KEEP, remedy: nil)</code>, <code>editor(actor, by:, reason:)</code>, <code>erase(actor, by:, reason:)</code>.</p>
+<h2 id="reference-retconbulk">Retcon::Bulk</h2>
+<p><code>upsert(model, rows, unique_by:, actor:, message: nil)</code>.</p>
+<h2 id="reference-retconedge">Retcon::Edge</h2>
+<p><code>retcon_triple(subject:, predicate:, object:, discriminator: nil)</code>, <code>link!(subject, predicate, object, attributes)</code>, <code>unlink!(subject, predicate, object)</code>, <code>retcon_identity(subject, predicate, object)</code>.</p>
+<h2 id="reference-retconschema-migrations">Retcon::Schema (migrations)</h2>
+<p><code>create_retcon_tables</code>, <code>version_table(table, id_type: nil)</code>, <code>add_retcon_dirty_trigger(table)</code>.</p>
+<h2 id="reference-errors">Errors</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Raised when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Retcon::Conflict</code></td>
+<td>fields changed since the base; <code>#conflicts</code> lists <code>FieldConflict</code>s</td>
+</tr>
+<tr>
+<td><code>Retcon::Invalid</code></td>
+<td>a record would be invalid after applying history to it; <code>#record</code></td>
+</tr>
+<tr>
+<td><code>Retcon::InvalidState</code></td>
+<td>a changeset can't move to the state asked for</td>
+</tr>
+<tr>
+<td><code>Retcon::Denied</code></td>
+<td>the policy refused an edit</td>
+</tr>
+<tr>
+<td><code>Retcon::NotVersioned</code></td>
+<td>a model or table isn't set up for retcon</td>
+</tr>
+<tr>
+<td><code>Retcon::Error</code></td>
+<td>the base class, and other misuse</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>Retcon::FieldConflict</code> has <code>model</code>, <code>record_id</code>, <code>field</code>, <code>base_seq</code>, <code>head_seq</code>, <code>current</code> and <code>proposed</code>.</p>
+</section>
+</main></div>
+<script>
+const links=[...document.querySelectorAll('nav a')];const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){const id=e.target.id;let a=map.get(id);if(!a)return;links.forEach(l=>l.classList.remove('active'));a.classList.add('active');const top=a.closest('nav>ul>li')?.querySelector('a.top');if(top&&top!==a)top.classList.add('active');}})},{rootMargin:'0px 0px -75% 0px'});
+document.querySelectorAll('section,section h2').forEach(el=>{if(el.id)obs.observe(el)});
+</script></body></html>
