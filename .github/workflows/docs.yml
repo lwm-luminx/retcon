@@ -1,0 +1,35 @@
+name: Docs
+
+# Builds the docs site from docs/*.md and publishes it to the gh-pages branch, which GitHub Pages serves at
+# https://lwm-luminx.github.io/retcon/.
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', 'bin/build-docs', 'lib/retcon/version.rb', '.github/workflows/docs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq pandoc
+      - run: ruby bin/build-docs site
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: Publish docs for ${{ github.sha }}

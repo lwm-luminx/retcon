@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>retcon</title>
+<meta name="description" content="VCS-style history for Active Record on PostgreSQL: attributed changesets, proposals, reverts and redaction.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf8;--panel:#f3f1ed;--text:#1d1b19;--muted:#6b665f;--line:#e4e0d9;--accent:#7a3cff;--accent-soft:#efe7ff;--code-bg:#f4f2ee;--kw:#8a2fc9;--st:#1d7a46;--co:#8a857d;--dv:#b4501a;--dt:#1f5fbf;--at:#0e7490;--wa:#b4235a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#141316;--panel:#1c1b1f;--text:#ecebe8;--muted:#a19c95;--line:#2d2b30;--accent:#b597ff;--accent-soft:#2a2240;--code-bg:#1b1a1e;--kw:#c79bff;--st:#7fd19b;--co:#8a857d;--dv:#f0a46b;--dt:#82b4ff;--at:#6fd3e6;--wa:#ff8db5}}
+:root[data-theme="dark"]{--bg:#141316;--panel:#1c1b1f;--text:#ecebe8;--muted:#a19c95;--line:#2d2b30;--accent:#b597ff;--accent-soft:#2a2240;--code-bg:#1b1a1e;--kw:#c79bff;--st:#7fd19b;--co:#8a857d;--dv:#f0a46b;--dt:#82b4ff;--at:#6fd3e6;--wa:#ff8db5}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 Inter,system-ui,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1180px;margin:0 auto}
+nav{position:sticky;top:0;height:100vh;overflow:auto;padding:28px 20px 40px max(20px,env(safe-area-inset-left,0px));border-right:1px solid var(--line)}
+nav .brand{font-weight:700;font-size:18px;margin-bottom:2px} nav .brand code{font-size:17px;background:none;padding:0}
+nav .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+nav ul{list-style:none;margin:0;padding:0} nav li{margin:0}
+nav a{display:block;color:var(--muted);font-size:13.5px;padding:3px 8px;border-radius:6px}
+nav a.top{color:var(--text);font-weight:600;font-size:14px;margin-top:10px}
+nav a.active{background:var(--accent-soft);color:var(--accent)}
+nav ul ul a{padding-left:16px}
+main{padding:40px max(16px,env(safe-area-inset-right,0px)) 120px 48px;min-width:0}
+.hero{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.hero h1{font-size:40px;line-height:1.1;margin:0 0 12px;letter-spacing:-.02em}
+.hero p{color:var(--muted);font-size:18px;margin:0;max-width:62ch}
+.links{margin-top:14px!important;font-size:15px!important}.install{margin:18px 0 0;max-width:340px}
+.pill{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px;margin-bottom:14px}
+section{padding-top:36px;border-top:1px solid var(--line);margin-top:36px} section:first-of-type{border-top:0;margin-top:0}
+section h1{font-size:30px;letter-spacing:-.015em;margin:0 0 12px}
+h2{font-size:21px;margin:32px 0 8px} h3{font-size:17px;margin:24px 0 6px}
+p,li{max-width:72ch}
+code{font-variant-ligatures:none;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;line-height:1.55}
+pre code{font-variant-ligatures:none;background:none;padding:0;font-size:13px}
+.sourceCode span{} .kw,.cf{color:var(--kw)} .st,.vs,.ss{color:var(--st)} .co{color:var(--co);font-style:italic} .dv,.fl,.cn{color:var(--dv)} .dt{color:var(--dt)} .at,.fu{color:var(--at)} .wa{color:var(--wa)}
+.tw{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel);font-weight:600} tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}
+@media (max-width:860px){
+ .wrap{display:block}
+ nav{position:sticky;top:0;z-index:5;height:auto;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:var(--bg);border-right:0;border-bottom:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-left,0px))}
+ nav .brand,nav .sub,nav ul ul{display:none} nav>ul>li{display:inline-block} nav a.top{margin:0 4px 0 0;font-size:13px}
+ main{padding:24px max(16px,env(safe-area-inset-right,0px)) 80px max(16px,env(safe-area-inset-left,0px))}
+ html{scroll-padding-top:56px} .hero h1{font-size:30px} td code{white-space:normal}
+}
+</style></head><body><div class="wrap">
+<nav><div class="brand"><code>retcon</code></div><div class="sub">History for Active Record on PostgreSQL</div><ul>{{NAV}}</ul></nav>
+<main><div class="hero"><span class="pill">v{{VERSION}} &middot; MIT</span><h1>retcon</h1>
+<p>Field-level history for every versioned table, with live tables kept as a projection of it. Edits are attributed changesets; proposals wait for review like pull requests; an actor&rsquo;s damage reverts without losing the work that came after it; and redaction scrubs a value from history while history still verifies.</p>
+<pre class="install"><code>gem 'retcon'</code></pre>
+<p class="links"><a href="https://github.com/lwm-luminx/retcon">GitHub</a> &middot; <a href="https://rubygems.org/gems/retcon">RubyGems</a> &middot; <a href="https://github.com/lwm-luminx/retcon/blob/main/CHANGELOG.md">Changelog</a></p></div>
+{{SECTIONS}}
+</main></div>
+<script>
+const links=[...document.querySelectorAll('nav a')];const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){const id=e.target.id;let a=map.get(id);if(!a)return;links.forEach(l=>l.classList.remove('active'));a.classList.add('active');const top=a.closest('nav>ul>li')?.querySelector('a.top');if(top&&top!==a)top.classList.add('active');}})},{rootMargin:'0px 0px -75% 0px'});
+document.querySelectorAll('section,section h2').forEach(el=>{if(el.id)obs.observe(el)});
+</script></body></html>

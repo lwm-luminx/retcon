@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Builds the docs site (one page, a section per docs/*.md) into the directory given (site/ by default). Needs pandoc.
+#
+#   bin/build-docs site
+
+require 'cgi'
+require 'fileutils'
+require 'open3'
+require_relative '../lib/retcon/version'
+
+root = File.expand_path('..', __dir__)
+out = File.expand_path(ARGV.fetch(0, 'site'), root)
+template = File.read(File.join(root, 'docs/site/template.html'))
+
+files = Dir[File.join(root, 'docs/[0-9][0-9]-*.md')]
+ids = files.map { |file| File.basename(file, '.md').sub(/\A\d+-/, '') }
+nav = []
+sections = []
+files.zip(ids).each do |file, id|
+  markdown = File.read(file)
+  title = markdown[/\A# (.+)$/, 1] or abort "#{file} has no # title"
+  html, status = Open3.capture2('pandoc', '-f', 'gfm', '-t', 'html', '--wrap=none', "--id-prefix=#{id}-",
+                                stdin_data: markdown)
+  abort "pandoc failed on #{file}" unless status.success?
+
+  html = html.gsub(%r{<a href="#[^"]*-cb\d+-\d+" aria-hidden="true" tabindex="-1"></a>}, '')
+             .sub(%r{<h1 id="[^"]*">.*?</h1>}m, '')
+             .gsub(/href="##{id}-([^"]+)"/) do |link|
+               target = Regexp.last_match(1)
+               ids.include?(target) ? %(href="##{target}") : link # a link to another page's section
+             end
+             .gsub('<table>', '<div class="tw"><table>').gsub('</table>', '</table></div>')
+  subs = html.scan(%r{<h2 id="([^"]+)">(.*?)</h2>}m)
+  links = subs.map { |sub_id, text| %(<li><a href="##{sub_id}">#{text}</a></li>) }.join
+  nav << %(<li><a href="##{id}" class="top">#{CGI.escapeHTML(title)}</a><ul>#{links}</ul></li>)
+  sections << %(<section id="#{id}"><h1>#{CGI.escapeHTML(title)}</h1>#{html}</section>)
+end
+
+FileUtils.mkdir_p(out)
+page = template.sub('{{NAV}}') { nav.join }.sub('{{SECTIONS}}') { sections.join }
+               .gsub('{{VERSION}}', Retcon::VERSION)
+File.write(File.join(out, 'index.html'), page)
+File.write(File.join(out, '.nojekyll'), '')
+puts "built #{File.join(out, 'index.html')} (#{sections.size} sections)"
